@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Converter Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3b82f6; /* blue-500 */
+            --primary-hover: #2563eb; /* blue-600 */
+            --secondary-bg: #1f2937; /* gray-800 */
+            --dark-bg: #111827; /* gray-900 */
+            --text-light: #f3f4f6; /* gray-100 */
+            --text-dark: #9ca3af; /* gray-400 */
+            --border-color: #374151; /* gray-700 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-light);
+        }
+        .upload-area.dragover {
+            border-color: var(--primary-color);
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .progress-bar div {
+            transition: width 0.3s ease-in-out;
+        }
+        /* Custom styles for range input */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]:focus::-webkit-slider-thumb {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        /* Hide number input spinners */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .preset-btn {
+            transition: all 0.2s ease;
+        }
+        .preset-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-6xl mx-auto bg-[var(--secondary-bg)] rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Image Converter Pro</h1>
+            <p class="text-[var(--text-dark)] mt-2">Original quality maintain karte hue images ko compress aur convert karein.</p>
+        </div>
+
+        <!-- Uploader -->
+        <div id="upload-area" class="relative border-2 border-dashed border-[var(--border-color)] rounded-xl p-8 md:p-12 text-center cursor-pointer transition-all duration-300 hover:border-[var(--primary-color)] hover:bg-opacity-5 hover:bg-blue-500">
+            <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" multiple accept="image/*,.heic,.heif,.avif,.svg">
+            <div class="flex flex-col items-center justify-center space-y-4">
+                <svg class="w-12 h-12 text-[var(--text-dark)]" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                <p class="text-lg font-medium text-white">Images ko yahan drag & drop karein</p>
+                <p class="text-[var(--text-dark)]">ya</p>
+                <button type="button" id="browse-btn" class="bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white font-semibold py-2 px-6 rounded-lg transition-colors">
+                    Files Chunein
+                </button>
+            </div>
+        </div>
+        
+        <!-- Main Content Area: Settings & File List -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
+            <!-- Settings Panel -->
+            <div class="lg:col-span-1 bg-[var(--dark-bg)] p-6 rounded-xl space-y-6 h-fit">
+                <h2 class="text-xl font-bold text-white border-b border-[var(--border-color)] pb-3">Conversion Settings</h2>
+                
+                <!-- Presets -->
+                <div>
+                    <label class="block text-sm font-medium text-[var(--text-dark)] mb-2">Presets</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button class="preset-btn bg-[var(--secondary-bg)] py-2 rounded-md text-sm" data-preset="tiny">Tiny</button>
+                        <button class="preset-btn bg-[var(--secondary-bg)] py-2 rounded-md text-sm active" data-preset="balanced">Balanced</button>
+                        <button class="preset-btn bg-[var(--secondary-bg)] py-2 rounded-md text-sm" data-preset="detail">Detail</button>
+                    </div>
+                </div>
+
+                <!-- Output Format -->
+                <div>
+                    <label for="format-select" class="block text-sm font-medium text-[var(--text-dark)] mb-2">Output Format</label>
+                    <select id="format-select" class="w-full bg-[var(--secondary-bg)] border border-[var(--border-color)] text-white rounded-lg p-2 focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)]">
+                        <option value="image/webp" selected>WEBP</option>
+                        <option value="image/jpeg">JPG</option>
+                        <option value="image/png">PNG</option>
+                        <option value="image/avif">AVIF</option>
+                    </select>
+                </div>
+                
+                <!-- Quality Slider -->
+                <div id="quality-section">
+                    <div class="flex justify-between items-center mb-2">
+                        <label for="quality-slider" class="text-sm font-medium text-[var(--text-dark)]">Quality</label>
+                        <span id="quality-value" class="text-sm font-semibold bg-[var(--secondary-bg)] px-2 py-1 rounded-md">70%</span>
+                    </div>
+                    <input type="range" id="quality-slider" min="1" max="100" value="70" class="w-full">
+                </div>
+                
+                <!-- Resize Options -->
+                <div>
+                    <label class="block text-sm font-medium text-[var(--text-dark)] mb-2">Resize</label>
+                    <div class="flex flex-col space-y-2">
+                         <div class="flex items-center">
+                            <input type="radio" id="resize-original" name="resize" value="original" class="hidden peer" checked>
+                            <label for="resize-original" class="flex items-center cursor-pointer text-sm peer-checked:text-[var(--primary-color)]">
+                                <span class="w-4 h-4 inline-block mr-2 rounded-full border border-[var(--text-dark)] peer-checked:border-[var(--primary-color)] peer-checked:bg-[var(--primary-color)]"></span>
+                                Original Size
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="resize-max" name="resize" value="max" class="hidden peer">
+                            <label for="resize-max" class="flex items-center cursor-pointer text-sm peer-checked:text-[var(--primary-color)]">
+                               <span class="w-4 h-4 inline-block mr-2 rounded-full border border-[var(--text-dark)] peer-checked:border-[var(--primary-color)] peer-checked:bg-[var(--primary-color)]"></span>
+                                Max Width/Height
+                            </label>
+                        </div>
+                    </div>
+                    <div id="resize-input-container" class="mt-2 hidden">
+                        <input type="number" id="resize-value" value="1600" class="w-full bg-[var(--secondary-bg)] border border-[var(--border-color)] text-white rounded-lg p-2 text-sm" placeholder="e.g., 1920">
+                    </div>
+                </div>
+
+                <!-- Metadata -->
+                <div class="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+                    <label for="strip-metadata" class="text-sm font-medium text-[var(--text-dark)]">Metadata hatayein</label>
+                    <label for="strip-metadata" class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="strip-metadata" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-[var(--border-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- File List & Actions -->
+            <div class="lg:col-span-2 space-y-4">
+                <div id="file-list-container" class="bg-[var(--dark-bg)] p-4 rounded-xl min-h-[300px] max-h-[50vh] overflow-y-auto">
+                    <div id="empty-state" class="flex flex-col items-center justify-center h-full text-center text-[var(--text-dark)]">
+                        <svg class="w-16 h-16" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m10 14-2 2 2 2"/><path d="m14 18 2-2-2-2"/></svg>
+                        <p class="mt-4 font-medium">Aapki files yahan dikhengi</p>
+                    </div>
+                    <div id="file-list" class="space-y-2"></div>
+                </div>
+                
+                <!-- Progress & Actions -->
+                <div class="space-y-4">
+                     <div id="progress-section" class="hidden">
+                        <div class="flex justify-between items-center mb-1">
+                            <span id="progress-text" class="text-sm font-medium text-[var(--text-dark)]">Converting...</span>
+                            <span id="progress-percent" class="text-sm font-bold text-white">0%</span>
+                        </div>
+                        <div class="progress-bar w-full bg-[var(--dark-bg)] rounded-full h-2.5">
+                            <div id="progress-bar-inner" class="bg-[var(--primary-color)] h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <button id="convert-btn" class="w-full bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m21.14 12 2.22-2.22a.5.5 0 0 0 0-.71l-2.13-2.12a.5.5 0 0 0-.71 0L18.3 9.17"/><path d="m16 4-2 2 1.17 1.17"/><path d="M2.73 14.01 2 14.73a.5.5 0 0 0 0 .71l2.12 2.12a.5.5 0 0 0 .71 0l.73-.73"/><path d="M8 16l-2-2-1.17-1.17"/><path d="m12 10 6 6 2-2-6-6-2 2"/><path d="m10 12 6 6-2 2-6-6 2-2"/></svg>
+                            <span>Convert Karein</span>
+                        </button>
+                        <button id="clear-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            <span>Queue Saaf Karein</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+         <p class="text-center text-xs text-[var(--text-dark)] pt-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 inline-block mr-1"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            100% Private: Saari processing aapke device par hoti hai. Images kabhi server par upload nahi hoti.
+        </p>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // DOM Elements
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const browseBtn = document.getElementById('browse-btn');
+        const fileListContainer = document.getElementById('file-list');
+        const emptyState = document.getElementById('empty-state');
+        const convertBtn = document.getElementById('convert-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        // Settings
+        const formatSelect = document.getElementById('format-select');
+        const qualitySection = document.getElementById('quality-section');
+        const qualitySlider = document.getElementById('quality-slider');
+        const qualityValue = document.getElementById('quality-value');
+        const resizeRadios = document.querySelectorAll('input[name="resize"]');
+        const resizeInputContainer = document.getElementById('resize-input-container');
+        const resizeValue = document.getElementById('resize-value');
+        const stripMetadataCheckbox = document.getElementById('strip-metadata');
+        const presetBtns = document.querySelectorAll('.preset-btn');
+        
+        // Progress
+        const progressSection = document.getElementById('progress-section');
+        const progressText = document.getElementById('progress-text');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+        
+        let filesToProcess = [];
+        const presets = {
+            tiny: { quality: 60, resize: 'max', size: 1280, metadata: true },
+            balanced: { quality: 70, resize: 'max', size: 1600, metadata: true },
+            detail: { quality: 85, resize: 'max', size: 1920, metadata: false },
+        };
+
+        // --- Event Listeners ---
+
+        browseBtn.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
+        });
+
+        uploadArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
+        
+        formatSelect.addEventListener('change', updateSettingsUI);
+        qualitySlider.addEventListener('input', () => qualityValue.textContent = `${qualitySlider.value}%`);
+        resizeRadios.forEach(radio => radio.addEventListener('change', updateSettingsUI));
+        
+        presetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const preset = btn.dataset.preset;
+                applyPreset(preset);
+                presetBtns.forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        convertBtn.addEventListener('click', startConversion);
+        clearBtn.addEventListener('click', clearQueue);
+
+        // --- Core Functions ---
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleFiles(files) {
+            const newFiles = [...files].filter(file => file.type.startsWith('image/'));
+            if(newFiles.length === 0) return;
+
+            newFiles.forEach(file => {
+                const fileId = `file-${Date.now()}-${Math.random()}`;
+                filesToProcess.push({
+                    id: fileId,
+                    file: file,
+                    name: file.name,
+                    size: file.size,
+                    status: 'pending',
+                    originalUrl: URL.createObjectURL(file),
+                    convertedBlob: null,
+                    convertedSize: null,
+                });
+            });
+            renderFileList();
+            updateButtonStates();
+        }
+        
+        function renderFileList() {
+            if (filesToProcess.length === 0) {
+                emptyState.classList.remove('hidden');
+                fileListContainer.innerHTML = '';
+            } else {
+                emptyState.classList.add('hidden');
+            }
+            
+            fileListContainer.innerHTML = ''; // Clear previous list
+            filesToProcess.forEach(fileObj => {
+                const fileElement = document.createElement('div');
+                fileElement.id = fileObj.id;
+                fileElement.className = 'flex items-center justify-between bg-[var(--secondary-bg)] p-3 rounded-lg text-sm';
+                fileElement.innerHTML = getFileHTML(fileObj);
+                fileListContainer.appendChild(fileElement);
+
+                const downloadBtn = fileElement.querySelector('.download-btn');
+                if (downloadBtn) {
+                    downloadBtn.onclick = () => downloadFile(fileObj);
+                }
+            });
+        }
+
+        function getFileHTML(fileObj) {
+            const getStatusIndicator = () => {
+                switch(fileObj.status) {
+                    case 'pending':
+                        return `<span class="text-yellow-400">Pending</span>`;
+                    case 'converting':
+                        return `<div class="loader"></div>`;
+                    case 'done':
+                        return `<span class="text-green-400 font-semibold">${formatBytes(fileObj.convertedSize)}</span>`;
+                    case 'error':
+                        return `<span class="text-red-400">Error</span>`;
+                    default: return '';
+                }
+            };
+
+            return `
+                <div class="flex items-center gap-3 w-2/5">
+                    <img src="${fileObj.originalUrl}" class="w-10 h-10 object-cover rounded-md">
+                    <div class="truncate">
+                        <p class="font-medium text-white truncate">${fileObj.name}</p>
+                        <p class="text-[var(--text-dark)]">${formatBytes(fileObj.size)}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 w-3/5 justify-end">
+                    <div class="w-24 text-center">${getStatusIndicator()}</div>
+                    ${fileObj.status === 'done' ? `
+                    <button class="download-btn bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white p-2 rounded-md transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    </button>
+                    ` : `
+                    <div class="w-12 h-9"></div>
+                    `}
+                </div>
+            `;
+        }
+
+        function updateFileElement(fileObj) {
+            const element = document.getElementById(fileObj.id);
+            if (element) {
+                element.innerHTML = getFileHTML(fileObj);
+                const downloadBtn = element.querySelector('.download-btn');
+                if (downloadBtn) {
+                    downloadBtn.onclick = () => downloadFile(fileObj);
+                }
+            }
+        }
+        
+        async function startConversion() {
+            const settings = getSettings();
+            let convertedCount = 0;
+
+            progressSection.classList.remove('hidden');
+            convertBtn.disabled = true;
+            clearBtn.disabled = true;
+
+            for (const fileObj of filesToProcess) {
+                if(fileObj.status === 'done') {
+                    convertedCount++;
+                    continue;
+                }
+                
+                fileObj.status = 'converting';
+                updateFileElement(fileObj);
+                
+                try {
+                    const blob = await processImage(fileObj.file, settings);
+                    fileObj.convertedBlob = blob;
+                    fileObj.convertedSize = blob.size;
+                    fileObj.status = 'done';
+                } catch (error) {
+                    console.error("Conversion error:", error);
+                    fileObj.status = 'error';
+                }
+
+                convertedCount++;
+                updateFileElement(fileObj);
+                updateProgress(convertedCount, filesToProcess.length);
+            }
+
+            clearBtn.disabled = false;
+        }
+
+        function processImage(file, settings) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        let { width, height } = img;
+                        if (settings.resize.mode === 'max' && (width > settings.resize.value || height > settings.resize.value)) {
+                            if (width > height) {
+                                height = Math.round(height * (settings.resize.value / width));
+                                width = settings.resize.value;
+                            } else {
+                                width = Math.round(width * (settings.resize.value / height));
+                                height = settings.resize.value;
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        // NOTE: Drawing to canvas naturally strips most metadata.
+                        // The 'strip metadata' option is implicitly handled.
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob(resolve, settings.format, settings.quality);
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        function downloadFile(fileObj) {
+            if (!fileObj.convertedBlob) return;
+            const url = URL.createObjectURL(fileObj.convertedBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            const name = fileObj.name.substring(0, fileObj.name.lastIndexOf('.'));
+            const ext = getSettings().format.split('/')[1];
+            a.download = `${name}.${ext}`;
+            
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        function clearQueue() {
+            filesToProcess.forEach(f => URL.revokeObjectURL(f.originalUrl));
+            filesToProcess = [];
+            renderFileList();
+            updateButtonStates();
+            progressSection.classList.add('hidden');
+            updateProgress(0, 0);
+        }
+
+        // --- Settings & UI Helpers ---
+        function getSettings() {
+            return {
+                format: formatSelect.value,
+                quality: formatSelect.value === 'image/png' ? 1 : qualitySlider.value / 100,
+                resize: {
+                    mode: document.querySelector('input[name="resize"]:checked').value,
+                    value: parseInt(resizeValue.value, 10) || 1600,
+                },
+                stripMetadata: stripMetadataCheckbox.checked,
+            };
+        }
+        
+        function updateSettingsUI() {
+            const selectedFormat = formatSelect.value;
+            qualitySection.style.display = selectedFormat === 'image/png' ? 'none' : 'block';
+
+            const resizeMode = document.querySelector('input[name="resize"]:checked').value;
+            resizeInputContainer.style.display = resizeMode === 'max' ? 'block' : 'none';
+        }
+
+        function applyPreset(presetName) {
+            const config = presets[presetName];
+            if (!config) return;
+            
+            qualitySlider.value = config.quality;
+            qualityValue.textContent = `${config.quality}%`;
+            
+            document.getElementById(`resize-${config.resize}`).checked = true;
+            resizeValue.value = config.size;
+            
+            stripMetadataCheckbox.checked = config.metadata;
+            updateSettingsUI();
+        }
+        
+        function updateButtonStates() {
+            const hasFiles = filesToProcess.length > 0;
+            convertBtn.disabled = !hasFiles;
+            clearBtn.disabled = !hasFiles;
+        }
+
+        function updateProgress(current, total) {
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+            progressText.textContent = `Converting ${current} / ${total}...`;
+            progressPercent.textContent = `${percent}%`;
+            progressBarInner.style.width = `${percent}%`;
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Initial setup
+        applyPreset('balanced');
+    });
+</script>
+</body>
+</html>
