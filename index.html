@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Converter Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -87,6 +88,27 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .radio-circle {
+            position: relative;
+        }
+        .radio-circle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0.5rem; /* 8px */
+            height: 0.5rem; /* 8px */
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.15s ease-in-out;
+        }
+        .peer:checked + label .radio-circle {
+            border-color: var(--primary-color);
+        }
+        .peer:checked + label .radio-circle::after {
+            transform: translate(-50%, -50%) scale(1);
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -96,7 +118,7 @@
         <!-- Header -->
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white">Image Converter Pro</h1>
-            <p class="text-[var(--text-dark)] mt-2">Original quality maintain karte hue images ko compress aur convert karein.</p>
+            <p class="text-[var(--text-dark)] mt-2">Convert and compress images while maintaining original quality.</p>
         </div>
 
         <!-- Uploader -->
@@ -104,10 +126,10 @@
             <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" multiple accept="image/*,.heic,.heif,.avif,.svg">
             <div class="flex flex-col items-center justify-center space-y-4">
                 <svg class="w-12 h-12 text-[var(--text-dark)]" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                <p class="text-lg font-medium text-white">Images ko yahan drag & drop karein</p>
-                <p class="text-[var(--text-dark)]">ya</p>
+                <p class="text-lg font-medium text-white">Drag & drop your images here</p>
+                <p class="text-[var(--text-dark)]">or</p>
                 <button type="button" id="browse-btn" class="bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white font-semibold py-2 px-6 rounded-lg transition-colors">
-                    Files Chunein
+                    Browse Files
                 </button>
             </div>
         </div>
@@ -155,14 +177,14 @@
                          <div class="flex items-center">
                             <input type="radio" id="resize-original" name="resize" value="original" class="hidden peer" checked>
                             <label for="resize-original" class="flex items-center cursor-pointer text-sm peer-checked:text-[var(--primary-color)]">
-                                <span class="w-4 h-4 inline-block mr-2 rounded-full border border-[var(--text-dark)] peer-checked:border-[var(--primary-color)] peer-checked:bg-[var(--primary-color)]"></span>
+                                <span class="radio-circle w-4 h-4 inline-block mr-2 rounded-full border border-[var(--text-dark)]"></span>
                                 Original Size
                             </label>
                         </div>
                         <div class="flex items-center">
                             <input type="radio" id="resize-max" name="resize" value="max" class="hidden peer">
                             <label for="resize-max" class="flex items-center cursor-pointer text-sm peer-checked:text-[var(--primary-color)]">
-                               <span class="w-4 h-4 inline-block mr-2 rounded-full border border-[var(--text-dark)] peer-checked:border-[var(--primary-color)] peer-checked:bg-[var(--primary-color)]"></span>
+                               <span class="radio-circle w-4 h-4 inline-block mr-2 rounded-full border border-[var(--text-dark)]"></span>
                                 Max Width/Height
                             </label>
                         </div>
@@ -174,7 +196,7 @@
 
                 <!-- Metadata -->
                 <div class="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
-                    <label for="strip-metadata" class="text-sm font-medium text-[var(--text-dark)]">Metadata hatayein</label>
+                    <label for="strip-metadata" class="text-sm font-medium text-[var(--text-dark)]">Strip Metadata</label>
                     <label for="strip-metadata" class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="strip-metadata" class="sr-only peer" checked>
                         <div class="w-11 h-6 bg-[var(--border-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
@@ -187,7 +209,7 @@
                 <div id="file-list-container" class="bg-[var(--dark-bg)] p-4 rounded-xl min-h-[300px] max-h-[50vh] overflow-y-auto">
                     <div id="empty-state" class="flex flex-col items-center justify-center h-full text-center text-[var(--text-dark)]">
                         <svg class="w-16 h-16" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m10 14-2 2 2 2"/><path d="m14 18 2-2-2-2"/></svg>
-                        <p class="mt-4 font-medium">Aapki files yahan dikhengi</p>
+                        <p class="mt-4 font-medium">Your files will appear here</p>
                     </div>
                     <div id="file-list" class="space-y-2"></div>
                 </div>
@@ -203,14 +225,18 @@
                             <div id="progress-bar-inner" class="bg-[var(--primary-color)] h-2.5 rounded-full" style="width: 0%"></div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="convert-btn" class="w-full bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m21.14 12 2.22-2.22a.5.5 0 0 0 0-.71l-2.13-2.12a.5.5 0 0 0-.71 0L18.3 9.17"/><path d="m16 4-2 2 1.17 1.17"/><path d="M2.73 14.01 2 14.73a.5.5 0 0 0 0 .71l2.12 2.12a.5.5 0 0 0 .71 0l.73-.73"/><path d="M8 16l-2-2-1.17-1.17"/><path d="m12 10 6 6 2-2-6-6-2 2"/><path d="m10 12 6 6-2 2-6-6 2-2"/></svg>
-                            <span>Convert Karein</span>
+                            <span>Convert Files</span>
+                        </button>
+                        <button id="download-all-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            <span>Download All (.zip)</span>
                         </button>
                         <button id="clear-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                            <span>Queue Saaf Karein</span>
+                            <span>Clear Queue</span>
                         </button>
                     </div>
                 </div>
@@ -218,7 +244,7 @@
         </div>
          <p class="text-center text-xs text-[var(--text-dark)] pt-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 inline-block mr-1"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            100% Private: Saari processing aapke device par hoti hai. Images kabhi server par upload nahi hoti.
+            100% Private: All processing happens on your device. Images are never uploaded to a server.
         </p>
     </div>
 
@@ -231,6 +257,7 @@
         const fileListContainer = document.getElementById('file-list');
         const emptyState = document.getElementById('empty-state');
         const convertBtn = document.getElementById('convert-btn');
+        const downloadAllBtn = document.getElementById('download-all-btn');
         const clearBtn = document.getElementById('clear-btn');
 
         // Settings
@@ -291,6 +318,7 @@
         });
 
         convertBtn.addEventListener('click', startConversion);
+        downloadAllBtn.addEventListener('click', downloadAllAsZip);
         clearBtn.addEventListener('click', clearQueue);
 
         // --- Core Functions ---
@@ -319,6 +347,7 @@
             });
             renderFileList();
             updateButtonStates();
+            fileInput.value = null; // Fix for re-selecting same files
         }
         
         function renderFileList() {
@@ -352,7 +381,11 @@
                     case 'converting':
                         return `<div class="loader"></div>`;
                     case 'done':
-                        return `<span class="text-green-400 font-semibold">${formatBytes(fileObj.convertedSize)}</span>`;
+                        const reduction = 100 - (fileObj.convertedSize / fileObj.size * 100);
+                        return `<div class="text-right">
+                                    <span class="text-green-400 font-semibold">${formatBytes(fileObj.convertedSize)}</span>
+                                    <span class="text-xs text-green-500 block">(-${reduction.toFixed(1)}%)</span>
+                                </div>`;
                     case 'error':
                         return `<span class="text-red-400">Error</span>`;
                     default: return '';
@@ -370,7 +403,7 @@
                 <div class="flex items-center gap-4 w-3/5 justify-end">
                     <div class="w-24 text-center">${getStatusIndicator()}</div>
                     ${fileObj.status === 'done' ? `
-                    <button class="download-btn bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white p-2 rounded-md transition-colors">
+                    <button class="download-btn bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white p-2 rounded-md transition-colors" title="Download this file">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                     </button>
                     ` : `
@@ -379,6 +412,7 @@
                 </div>
             `;
         }
+
 
         function updateFileElement(fileObj) {
             const element = document.getElementById(fileObj.id);
@@ -389,6 +423,7 @@
                     downloadBtn.onclick = () => downloadFile(fileObj);
                 }
             }
+            updateButtonStates();
         }
         
         async function startConversion() {
@@ -450,8 +485,6 @@
                         canvas.width = width;
                         canvas.height = height;
                         
-                        // NOTE: Drawing to canvas naturally strips most metadata.
-                        // The 'strip metadata' option is implicitly handled.
                         ctx.drawImage(img, 0, 0, width, height);
 
                         canvas.toBlob(resolve, settings.format, settings.quality);
@@ -479,6 +512,45 @@
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        }
+
+        async function downloadAllAsZip() {
+            if (typeof JSZip === 'undefined') {
+                console.error('JSZip library is not loaded.');
+                alert('Could not create ZIP file. JSZip library is missing.');
+                return;
+            }
+
+            const zip = new JSZip();
+            const convertedFiles = filesToProcess.filter(f => f.status === 'done' && f.convertedBlob);
+
+            if (convertedFiles.length === 0) return;
+            
+            const originalBtnHTML = downloadAllBtn.innerHTML;
+            downloadAllBtn.innerHTML = `<div class="loader-white"></div><span>Zipping...</span>`;
+            downloadAllBtn.disabled = true;
+
+            convertedFiles.forEach(fileObj => {
+                const name = fileObj.name.substring(0, fileObj.name.lastIndexOf('.'));
+                const ext = fileObj.convertedBlob.type.split('/')[1];
+                const fileName = `${name}.${ext}`;
+                zip.file(fileName, fileObj.convertedBlob);
+            });
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'converted-images.zip';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            downloadAllBtn.innerHTML = originalBtnHTML;
+            downloadAllBtn.disabled = false;
         }
 
         function clearQueue() {
@@ -527,8 +599,11 @@
         
         function updateButtonStates() {
             const hasFiles = filesToProcess.length > 0;
+            const hasConvertedFiles = filesToProcess.some(f => f.status === 'done');
+            
             convertBtn.disabled = !hasFiles;
             clearBtn.disabled = !hasFiles;
+            downloadAllBtn.disabled = !hasConvertedFiles;
         }
 
         function updateProgress(current, total) {
@@ -553,3 +628,4 @@
 </script>
 </body>
 </html>
+
