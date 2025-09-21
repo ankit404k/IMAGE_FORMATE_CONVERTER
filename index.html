@@ -84,6 +84,15 @@
             height: 16px;
             animation: spin 1s linear infinite;
         }
+        .loader-white {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -156,6 +165,7 @@
                     <select id="format-select" class="w-full bg-[var(--secondary-bg)] border border-[var(--border-color)] text-white rounded-lg p-2 focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)]">
                         <option value="image/webp" selected>WEBP</option>
                         <option value="image/jpeg">JPG</option>
+                        <option value="image/jpeg">JPEG</option>
                         <option value="image/png">PNG</option>
                         <option value="image/avif">AVIF</option>
                     </select>
@@ -194,6 +204,18 @@
                     </div>
                 </div>
 
+                <!-- Extreme Compression -->
+                <div class="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+                    <label for="extreme-compression" class="text-sm font-medium text-[var(--text-dark)] flex items-center">
+                        Extreme Compression
+                        <span title="Uses multi-step resizing for potentially smaller file sizes at the cost of slightly lower quality." class="ml-1.5 text-[var(--primary-color)] cursor-help">[?]</span>
+                    </label>
+                    <label for="extreme-compression" class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="extreme-compression" class="sr-only peer">
+                        <div class="w-11 h-6 bg-[var(--border-color)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--primary-color)]"></div>
+                    </label>
+                </div>
+                
                 <!-- Metadata -->
                 <div class="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
                     <label for="strip-metadata" class="text-sm font-medium text-[var(--text-dark)]">Strip Metadata</label>
@@ -269,6 +291,7 @@
         const resizeInputContainer = document.getElementById('resize-input-container');
         const resizeValue = document.getElementById('resize-value');
         const stripMetadataCheckbox = document.getElementById('strip-metadata');
+        const extremeCompressionCheckbox = document.getElementById('extreme-compression');
         const presetBtns = document.querySelectorAll('.preset-btn');
         
         // Progress
@@ -279,15 +302,92 @@
         
         let filesToProcess = [];
         const presets = {
-            tiny: { quality: 60, resize: 'max', size: 1280, metadata: true },
-            balanced: { quality: 70, resize: 'max', size: 1600, metadata: true },
-            detail: { quality: 85, resize: 'max', size: 1920, metadata: false },
+            tiny: { quality: 60, resize: 'max', size: 1280, metadata: true, extreme: true },
+            balanced: { quality: 70, resize: 'max', size: 1600, metadata: true, extreme: false },
+            detail: { quality: 85, resize: 'max', size: 1920, metadata: false, extreme: false },
         };
+
+        // --- Web Worker for background processing ---
+        let imageProcessingWorker;
+        
+        const workerCode = `
+            function processImageInWorker(file, settings) {
+                return new Promise((resolve, reject) => {
+                    createImageBitmap(file)
+                        .then(imageBitmap => {
+                            let { width, height } = imageBitmap;
+
+                            if (settings.resize.mode === 'max' && (width > settings.resize.value || height > settings.resize.value)) {
+                                const ratio = width / height;
+                                if (ratio > 1) { // Landscape
+                                    width = settings.resize.value;
+                                    height = Math.round(width / ratio);
+                                } else { // Portrait or square
+                                    height = settings.resize.value;
+                                    width = Math.round(height * ratio);
+                                }
+                            }
+                            
+                            const canvas = new OffscreenCanvas(width, height);
+                            const ctx = canvas.getContext('2d');
+
+                            if (settings.extremeCompression && imageBitmap.width > width * 2) {
+                                let tempCanvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+                                let tctx = tempCanvas.getContext('2d');
+                                tctx.drawImage(imageBitmap, 0, 0);
+
+                                let curW = imageBitmap.width;
+                                let curH = imageBitmap.height;
+
+                                while (curW * 0.5 > width) {
+                                    curW *= 0.5;
+                                    curH *= 0.5;
+                                    tctx.drawImage(tempCanvas, 0, 0, curW * 2, curH * 2, 0, 0, curW, curH);
+                                }
+                                ctx.drawImage(tempCanvas, 0, 0, curW, curH, 0, 0, width, height);
+
+                            } else {
+                                ctx.imageSmoothingQuality = 'high';
+                                ctx.drawImage(imageBitmap, 0, 0, width, height);
+                            }
+
+                            return canvas.convertToBlob({
+                                type: settings.format,
+                                quality: settings.quality
+                            });
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                });
+            }
+
+            self.onmessage = async (e) => {
+                const { file, settings } = e.data;
+                try {
+                    const blob = await processImageInWorker(file, settings);
+                    self.postMessage({ success: true, blob });
+                } catch (error) {
+                    self.postMessage({ success: false, error: error.message });
+                }
+            };
+        `;
+        
+        function initializeWorker() {
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            imageProcessingWorker = new Worker(URL.createObjectURL(blob));
+        }
+
+        initializeWorker();
+
 
         // --- Event Listeners ---
 
         browseBtn.addEventListener('click', () => fileInput.click());
-        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('click', (e) => {
+            if (e.target === uploadArea || e.target.closest('div')) {
+                fileInput.click();
+            }
+        });
         fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -343,11 +443,12 @@
                     originalUrl: URL.createObjectURL(file),
                     convertedBlob: null,
                     convertedSize: null,
+                    convertedExtension: null,
                 });
             });
             renderFileList();
             updateButtonStates();
-            fileInput.value = null; // Fix for re-selecting same files
+            fileInput.value = null;
         }
         
         function renderFileList() {
@@ -358,7 +459,7 @@
                 emptyState.classList.add('hidden');
             }
             
-            fileListContainer.innerHTML = ''; // Clear previous list
+            fileListContainer.innerHTML = '';
             filesToProcess.forEach(fileObj => {
                 const fileElement = document.createElement('div');
                 fileElement.id = fileObj.id;
@@ -448,6 +549,7 @@
                     fileObj.convertedBlob = blob;
                     fileObj.convertedSize = blob.size;
                     fileObj.status = 'done';
+                    fileObj.convertedExtension = settings.formatText.toLowerCase();
                 } catch (error) {
                     console.error("Conversion error:", error);
                     fileObj.status = 'error';
@@ -463,37 +565,17 @@
 
         function processImage(file, settings) {
             return new Promise((resolve, reject) => {
-                const img = new Image();
-                const reader = new FileReader();
-
-                reader.onload = (e) => {
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        let { width, height } = img;
-                        if (settings.resize.mode === 'max' && (width > settings.resize.value || height > settings.resize.value)) {
-                            if (width > height) {
-                                height = Math.round(height * (settings.resize.value / width));
-                                width = settings.resize.value;
-                            } else {
-                                width = Math.round(width * (settings.resize.value / height));
-                                height = settings.resize.value;
-                            }
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        canvas.toBlob(resolve, settings.format, settings.quality);
-                    };
-                    img.onerror = reject;
-                    img.src = e.target.result;
+                imageProcessingWorker.onmessage = (e) => {
+                    if (e.data.success) {
+                        resolve(e.data.blob);
+                    } else {
+                        reject(new Error(e.data.error));
+                    }
                 };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
+                imageProcessingWorker.onerror = (e) => {
+                    reject(new Error(`Worker error: ${e.message}`));
+                };
+                imageProcessingWorker.postMessage({ file, settings });
             });
         }
         
@@ -505,7 +587,7 @@
             a.href = url;
             
             const name = fileObj.name.substring(0, fileObj.name.lastIndexOf('.'));
-            const ext = getSettings().format.split('/')[1];
+            const ext = fileObj.convertedExtension;
             a.download = `${name}.${ext}`;
             
             document.body.appendChild(a);
@@ -516,7 +598,6 @@
 
         async function downloadAllAsZip() {
             if (typeof JSZip === 'undefined') {
-                console.error('JSZip library is not loaded.');
                 alert('Could not create ZIP file. JSZip library is missing.');
                 return;
             }
@@ -532,7 +613,7 @@
 
             convertedFiles.forEach(fileObj => {
                 const name = fileObj.name.substring(0, fileObj.name.lastIndexOf('.'));
-                const ext = fileObj.convertedBlob.type.split('/')[1];
+                const ext = fileObj.convertedExtension;
                 const fileName = `${name}.${ext}`;
                 zip.file(fileName, fileObj.convertedBlob);
             });
@@ -564,20 +645,23 @@
 
         // --- Settings & UI Helpers ---
         function getSettings() {
+            const selectedOption = formatSelect.options[formatSelect.selectedIndex];
             return {
                 format: formatSelect.value,
+                formatText: selectedOption.text,
                 quality: formatSelect.value === 'image/png' ? 1 : qualitySlider.value / 100,
                 resize: {
                     mode: document.querySelector('input[name="resize"]:checked').value,
                     value: parseInt(resizeValue.value, 10) || 1600,
                 },
                 stripMetadata: stripMetadataCheckbox.checked,
+                extremeCompression: extremeCompressionCheckbox.checked,
             };
         }
         
         function updateSettingsUI() {
             const selectedFormat = formatSelect.value;
-            qualitySection.style.display = selectedFormat === 'image/png' ? 'none' : 'block';
+            qualitySection.style.display = selectedFormat.includes('png') ? 'none' : 'block';
 
             const resizeMode = document.querySelector('input[name="resize"]:checked').value;
             resizeInputContainer.style.display = resizeMode === 'max' ? 'block' : 'none';
@@ -594,6 +678,7 @@
             resizeValue.value = config.size;
             
             stripMetadataCheckbox.checked = config.metadata;
+            extremeCompressionCheckbox.checked = config.extreme;
             updateSettingsUI();
         }
         
